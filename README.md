@@ -1,56 +1,42 @@
-# Welcome to your Expo app 👋
+# Big Harvest 🌾🚜
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+**Big Harvest** is an addictive, high-frequency MMO farming simulator built for mobile platforms using Expo and React Native. The game emphasizes real-time micro-economies, strict time-management mechanics (FOMO), and dynamic player interactions.
 
-## Get started
+## Key Features
 
-1. Install dependencies
+- **High-Frequency Performance:** Driven by heavily optimized WebSockets and Protobuf for blazing-fast payload transmission, minimal battery drain, and instant UI updates.
+- **FOMO Mechanics:** Crops wither if ignored. Animals get sad, then sick. A fleeting Black Market Trader forces players to log in regularly.
+- **Social & Economic Warfare:** Join Syndicates (Cartels) to manipulate market commodities, send gifts via P2P transfers, or coordinate protests against mega-rich farmers to trigger punishing tax decrees.
+- **Global Server Systems:** Watch the dynamic live leaderboard, contribute to massive global server bounties, and experience a progressive wealth tax that balances the economy.
+- **Offline Capabilities:** Local-first architecture allows you to manage crops and animals on the go, synchronizing seamlessly with the server when reconnected.
 
+## Game Architecture
+
+Big Harvest employs a **Local-First, Server-Authoritative** architecture to achieve offline playability inside a strict MMO environment.
+
+### 1. The Local-First Frontend
+
+- **Framework:** React Native (Expo)
+- **Local Database:** WatermelonDB. The UI only ever reads from and writes to the local database, allowing rapid optimistic updates.
+- **Action Queue:** If the player is offline, single-player farming actions (harvesting, feeding) are recorded into a persistent local queue.
+
+### 2. High-Frequency Networking
+
+- **WebSockets:** A persistent bidirectional connection streams live leaderboard updates, market crashes (`DUMP_DETECTED`), and chats.
+- **Protobuf (Protocol Buffers):** Binary serialization shrinks data payloads, which is critical for sending tracking info, player activity, and 10-second leaderboard broadcasts over mobile networks.
+
+### 3. Server Resolution & Reconnection
+
+- When the player comes back online, the queued actions are transmitted over WebSockets.
+- **Server Truth:** The server's clock is the absolute source of truth. If a player claims they harvested offline, but the server determines the crop withered before the action was made (or the player manipulated their local time), the server rejects the harvest and sends a reconciliation event (`withered: true`). The client's local DB then rolls back and shows the withered sprites.
+
+## 🛠 Getting Started
+
+1. Install dependencies:
    ```bash
    npm install
    ```
-
-2. Start the app
-
+2. Run the application:
    ```bash
    npx expo start
    ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
-
-```bash
-npm run reset-project
-```
-
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
-
-### Other setup steps
-
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
-
-## Learn more
-
-To learn more about developing your project with Expo, look at the following resources:
-
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
-
-## Join the community
-
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
