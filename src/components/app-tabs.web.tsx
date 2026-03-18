@@ -28,8 +28,8 @@ const TAB_CONFIG = [
 ] as const;
 
 export default function AppTabsWeb() {
-  const scheme = useColorScheme();
-  const colors = Colors[scheme ?? "light"];
+  const scheme = useColorScheme() ?? "light";
+  const colors = Colors[scheme];
 
   return (
     <NativeTabs

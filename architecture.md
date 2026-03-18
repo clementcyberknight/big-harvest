@@ -1,4 +1,4 @@
-# Farville Game Architecture Implementation Plan
+# Big Harvest Game Architecture Implementation Plan
 
 This plan outlines the design and implementation of the Farville idle farm RPG, focusing on a robust architecture, secure game logic, and an anti-cheating system.
 
