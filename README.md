@@ -1,6 +1,6 @@
-# Big Harvest 🌾🚜
+# Ravolo 🌾🚜
 
-**Big Harvest** is an addictive, high-frequency MMO farming simulator built for mobile platforms using Expo and React Native. The game emphasizes real-time micro-economies, strict time-management mechanics (FOMO), and dynamic player interactions.
+**Ravolo** is an addictive, high-frequency MMO farming simulator built for mobile platforms using Expo and React Native. The game emphasizes real-time micro-economies, strict time-management mechanics (FOMO), and dynamic player interactions.
 
 ## Key Features
 

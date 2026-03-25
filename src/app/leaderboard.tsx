@@ -10,7 +10,7 @@ export default function LeaderboardScreen() {
     <ThemedView style={styles.container}>
       <ThemedText type="subtitle">Leaderboard</ThemedText>
       <ThemedText themeColor="textSecondary">
-        Track top players and seasonal rankings in Big Harvest.
+        Track top players and seasonal rankings in Ravolo.
       </ThemedText>
     </ThemedView>
   );
