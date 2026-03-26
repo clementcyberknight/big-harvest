@@ -1,14 +1,18 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
-import React, { useEffect } from 'react';
-import * as SplashScreen from 'expo-splash-screen';
-import { StatusBar } from 'expo-status-bar';
-import * as NavigationBar from 'expo-navigation-bar';
-import { Platform, useColorScheme, View } from 'react-native';
+import {
+  DarkTheme,
+  DefaultTheme,
+  ThemeProvider,
+} from "@react-navigation/native";
+import * as NavigationBar from "expo-navigation-bar";
+import * as SplashScreen from "expo-splash-screen";
+import { StatusBar } from "expo-status-bar";
+import React, { useEffect } from "react";
+import { Platform, useColorScheme, View } from "react-native";
 
-import AppTabs from '@/components/app-tabs';
-import { ProfileHeader } from '@/components/profile-header';
-import { OnboardingScreen } from '@/components/onboarding-screen';
-import { useAppStore } from '@/store/app-store';
+import AppTabs from "@/components/app-tabs";
+import { OnboardingScreen } from "@/components/onboarding-screen";
+import { ProfileHeader } from "@/components/profile-header";
+import { useAppStore } from "@/store/app-store";
 
 // Keep the native splash screen visible while we fetch resources
 SplashScreen.preventAutoHideAsync();
@@ -16,7 +20,9 @@ SplashScreen.preventAutoHideAsync();
 export default function TabLayout() {
   const colorScheme = useColorScheme();
   const isHydrated = useAppStore((state) => state._hasHydrated);
-  const hasCompletedOnboarding = useAppStore((state) => state.hasCompletedOnboarding);
+  const hasCompletedOnboarding = useAppStore(
+    (state) => state.hasCompletedOnboarding,
+  );
 
   useEffect(() => {
     if (isHydrated) {
@@ -26,10 +32,9 @@ export default function TabLayout() {
   }, [isHydrated]);
 
   useEffect(() => {
-    if (Platform.OS === 'android') {
-      NavigationBar.setBackgroundColorAsync('transparent');
-      NavigationBar.setButtonStyleAsync('light');
-      NavigationBar.setPositionAsync('absolute');
+    if (Platform.OS === "android") {
+      NavigationBar.setVisibilityAsync("hidden");
+      NavigationBar.setBehaviorAsync("overlay-swipe");
     }
   }, []);
 
@@ -38,7 +43,7 @@ export default function TabLayout() {
   }
 
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+    <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
       <StatusBar hidden />
       {!hasCompletedOnboarding ? (
         <OnboardingScreen />

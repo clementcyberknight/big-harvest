@@ -15,7 +15,12 @@ interface InventoryState {
 }
 
 export const useInventoryStore = create<InventoryState>((set, get) => ({
-  items: {},
+  items: {
+    corn: { id: "corn", type: "crop", quantity: 24 },
+    carrot: { id: "carrot", type: "crop", quantity: 18 },
+    strawberry: { id: "strawberry", type: "crop", quantity: 12 },
+    wheat: { id: "wheat", type: "crop", quantity: 10 },
+  },
 
   addResource: (id, type, amount) =>
     set((state) => {

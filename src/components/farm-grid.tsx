@@ -2,8 +2,9 @@ import { Image } from "expo-image";
 import React, { memo, useCallback } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
-import { CropType, useFarmStore } from "@/store/farm-store";
+import { useFarmStore } from "@/store/farm-store";
 import { useGameStore } from "@/store/game-store";
+import { CROP_GUIDE, CropType } from "@/constants/crops";
 
 const soilImage = require("@/assets/image/Gemini_Generated_Image_a8azi1a8azi1a8az.png");
 const growImage = require("@/assets/image/assets_images_icons_misc_grow.webp");
@@ -37,17 +38,52 @@ const cropAssets: Record<CropType, any> = {
 };
 
 const formatCropName = (id: string) => {
-  return id.charAt(0).toUpperCase() + id.slice(1).replace(/_/g, " ");
+  return id.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
 };
+
+const formatTime = (seconds: number) => {
+  if (seconds <= 0) return "0s";
+  const m = Math.floor(seconds / 60);
+  const s = Math.floor(seconds % 60);
+  if (m > 0) return `${m}m ${s}s`;
+  return `${s}s`;
+};
+
+function useTimer(plot: any) {
+  const [remaining, setRemaining] = React.useState(0);
+
+  React.useEffect(() => {
+    if (plot?.status !== "planted" || !plot.plantedAt || !plot.cropId) {
+      setRemaining(0);
+      return;
+    }
+
+    const cropDef = CROP_GUIDE[plot.cropId as CropType];
+    const targetTime = plot.plantedAt + cropDef.growthTime * 1000;
+
+    const update = () => {
+      const now = Date.now();
+      const diff = Math.max(0, Math.ceil((targetTime - now) / 1000));
+      setRemaining(diff);
+    };
+
+    update();
+    const interval = setInterval(update, 1000);
+    return () => clearInterval(interval);
+  }, [plot?.status, plot?.plantedAt, plot?.cropId]);
+
+  return remaining;
+}
 
 const FarmTile = memo(function FarmTile({ id }: { id: string }) {
   const plot = useFarmStore((state) => state.plots[id]);
   const plantCrop = useFarmStore((state) => state.plantCrop);
-  const growCrop = useFarmStore((state) => state.growCrop);
   const harvestCrop = useFarmStore((state) => state.harvestCrop);
 
   const addCoins = useGameStore((state) => state.addCoins);
   const addXp = useGameStore((state) => state.addXp);
+
+  const remaining = useTimer(plot);
 
   const handlePress = useCallback(() => {
     if (!plot) return;
@@ -55,13 +91,19 @@ const FarmTile = memo(function FarmTile({ id }: { id: string }) {
     if (plot.status === "empty") {
       plantCrop(plot.id);
     } else if (plot.status === "planted") {
-      growCrop(plot.id);
+      // Potentially show "Still growing" or "Speed up"
+      if (remaining <= 0) {
+        // Fallback if the timer didn't catch the transition
+        harvestCrop(plot.id);
+        addCoins(10);
+        addXp(5);
+      }
     } else if (plot.status === "ready") {
       harvestCrop(plot.id);
       addCoins(10);
       addXp(5);
     }
-  }, [plot, plantCrop, growCrop, harvestCrop, addCoins, addXp]);
+  }, [plot, plantCrop, harvestCrop, addCoins, addXp, remaining]);
 
   if (!plot) return null;
 
@@ -86,8 +128,8 @@ const FarmTile = memo(function FarmTile({ id }: { id: string }) {
         {plot.status === "planted" && plot.cropId && (
           <View style={styles.readyContent}>
             <Image
-              source={growImage}
-              style={styles.cropImageReady}
+              source={cropAssets[plot.cropId]}
+              style={[styles.cropImageReady, { opacity: 0.5 }]}
               contentFit="contain"
               cachePolicy="memory-disk"
             />
@@ -97,6 +139,9 @@ const FarmTile = memo(function FarmTile({ id }: { id: string }) {
               adjustsFontSizeToFit
             >
               {formatCropName(plot.cropId)}
+            </Text>
+            <Text style={styles.timerText}>
+              {remaining > 0 ? formatTime(remaining) : "Ready!"}
             </Text>
           </View>
         )}
@@ -216,5 +261,11 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: "800",
     color: "#4CAF50",
+  },
+  timerText: {
+    fontSize: 10,
+    fontWeight: "600",
+    color: "#666",
+    marginTop: 2,
   },
 });

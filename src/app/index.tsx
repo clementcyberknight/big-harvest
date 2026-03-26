@@ -9,22 +9,38 @@ import { HomeSubTabs, HomeTabType } from "@/components/home-sub-tabs";
 import { InventoryModal } from "@/components/inventory-modal";
 import { MarketModal } from "@/components/market-modal";
 import { RanchGrid } from "@/components/ranch-grid";
+import { SeedSelectorModal } from "@/components/seed-selector-modal";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { BottomTabInset } from "@/constants/theme";
+import { useFarmStore } from "@/store/farm-store";
 import { useInventoryStore } from "@/store/inventory-store";
 
 const inventoryIcon = require("@/assets/image/assets_images_icons_misc_box.webp");
 const marketIcon = require("@/assets/image/assets_images_icons_misc_market.webp");
+const seedIcon = require("@/assets/image/assets_images_icons_misc_emoji_wheat.webp");
+
+const cropAssets: Record<string, any> = {
+  wheat: require("@/assets/image/assets_images_icons_crops_wheat.webp"),
+  corn: require("@/assets/image/assets_images_icons_crops_corn.webp"),
+  carrot: require("@/assets/image/assets_images_icons_crops_carrot.webp"),
+};
 
 export default function HomeScreen() {
   const [activeTab, setActiveTab] = useState<HomeTabType>("farm");
   const [inventoryVisible, setInventoryVisible] = useState(false);
   const [marketVisible, setMarketVisible] = useState(false);
+  const [seedSelectorVisible, setSeedSelectorVisible] = useState(false);
+
+  const selectedCropId = useFarmStore((state) => state.selectedCropId);
+  const setSelectedCropId = useFarmStore((state) => state.setSelectedCropId);
 
   // Sum total items in inventory for the badge
   const totalItems = useInventoryStore((state) =>
     Object.values(state.items).reduce((acc, item) => acc + item.quantity, 0),
+  );
+  const selectedCropQuantity = useInventoryStore(
+    (state) => state.items[selectedCropId]?.quantity || 0,
   );
 
   return (
@@ -44,20 +60,9 @@ export default function HomeScreen() {
         </ScrollView>
 
         {/* Floating Action Buttons */}
-        <View style={styles.floatingActionsRight}>
-          <Pressable style={styles.fab} onPress={() => setMarketVisible(true)}>
-            <Image
-              source={marketIcon}
-              style={styles.fabImage}
-              contentFit="contain"
-            />
-            <View style={styles.badgeRed}>
-              <ThemedText style={styles.badgeTextLight}>1</ThemedText>
-            </View>
-          </Pressable>
-
+        <View style={styles.floatingActionsLeft}>
           <Pressable
-            style={styles.fab}
+            style={[styles.fab, styles.fabDark]}
             onPress={() => setInventoryVisible(true)}
           >
             <Image
@@ -70,6 +75,40 @@ export default function HomeScreen() {
             </View>
           </Pressable>
         </View>
+
+        <View style={styles.floatingActionsRight}>
+          <Pressable
+            style={[styles.fab, styles.fabGreen]}
+            onPress={() => setSeedSelectorVisible(true)}
+          >
+            <Image
+              source={cropAssets[selectedCropId] || seedIcon}
+              style={styles.fabImage}
+              contentFit="contain"
+            />
+            <View
+              style={[
+                styles.badgeRed,
+                selectedCropQuantity === 0 ? styles.badgeGray : null,
+              ]}
+            >
+              <ThemedText style={styles.badgeTextLight}>
+                {selectedCropQuantity}
+              </ThemedText>
+            </View>
+          </Pressable>
+
+          <Pressable
+            style={[styles.fab, styles.fabDark]}
+            onPress={() => setMarketVisible(true)}
+          >
+            <Image
+              source={marketIcon}
+              style={styles.fabImage}
+              contentFit="contain"
+            />
+          </Pressable>
+        </View>
       </SafeAreaView>
 
       <InventoryModal
@@ -80,6 +119,11 @@ export default function HomeScreen() {
       <MarketModal
         visible={marketVisible}
         onClose={() => setMarketVisible(false)}
+      />
+
+      <SeedSelectorModal
+        visible={seedSelectorVisible}
+        onClose={() => setSeedSelectorVisible(false)}
       />
     </ThemedView>
   );
@@ -133,16 +177,35 @@ const styles = StyleSheet.create({
   },
   floatingActionsRight: {
     position: "absolute",
-    bottom: BottomTabInset + 60,
+    bottom: BottomTabInset + 20,
     right: 16,
     zIndex: 10,
-    gap: 16,
+    gap: 12,
     alignItems: "flex-end",
   },
+  floatingActionsLeft: {
+    position: "absolute",
+    bottom: BottomTabInset + 20,
+    left: 16,
+    zIndex: 10,
+    alignItems: "flex-start",
+  },
   fab: {
-    width: 60,
-    height: 60,
-    position: "relative",
+    width: 64,
+    height: 64,
+    borderRadius: 20,
+    padding: 12,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  fabDark: {
+    backgroundColor: "#032018",
+  },
+  fabGreen: {
+    backgroundColor: "#71B312",
   },
   fabImage: {
     width: "100%",
@@ -150,12 +213,13 @@ const styles = StyleSheet.create({
   },
   badgeRed: {
     position: "absolute",
-    top: -5,
-    right: -5,
+    top: -8,
+    right: -8,
     backgroundColor: "#F44336",
-    borderRadius: 12,
-    minWidth: 20,
-    height: 20,
+    borderRadius: 14,
+    minWidth: 24,
+    height: 24,
+    paddingHorizontal: 4,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 2,
@@ -177,8 +241,8 @@ const styles = StyleSheet.create({
   },
   badgeTextLight: {
     color: "#FFF",
-    fontSize: 10,
-    fontWeight: "800",
+    fontSize: 11,
+    fontWeight: "900",
   },
   badgeTextDark: {
     color: "#333",
