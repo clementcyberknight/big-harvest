@@ -440,7 +440,7 @@ export const MarketModal = ({ visible, onClose }: MarketModalProps) => {
   if (isCreatingSale) {
     return (
       <Modal visible={visible} transparent animationType="slide">
-        <View style={[styles.container, { paddingTop: insets.top }]}>
+        <View style={[styles.container, { paddingTop: Math.max(insets.top, 20) + 8 }]}>
           <View style={styles.createSaleHeader}>
             <Pressable
               style={styles.backButton}
@@ -584,7 +584,7 @@ export const MarketModal = ({ visible, onClose }: MarketModalProps) => {
     return (
       <Modal visible={visible} transparent animationType="slide">
         <View
-          style={[styles.createRequestContainer, { paddingTop: insets.top }]}
+          style={[styles.createRequestContainer, { paddingTop: Math.max(insets.top, 20) + 8 }]}
         >
           <View style={styles.reqHeader}>
             <View>
@@ -785,7 +785,7 @@ export const MarketModal = ({ visible, onClose }: MarketModalProps) => {
 
   return (
     <Modal visible={visible} transparent animationType="slide">
-      <View style={[styles.container, { paddingTop: insets.top }]}>
+      <View style={[styles.container, { paddingTop: Math.max(insets.top, 20) + 8 }]}>
         {/* Top Tier Segment (Buy & Sell / Requests) */}
         <View style={styles.topTabs}>
           <Pressable

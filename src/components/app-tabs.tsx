@@ -10,8 +10,8 @@ const TAB_CONFIG = [
     icon: require("@/assets/inapp-icons/Farm-Light--Streamline-Phosphor.png"),
   },
   {
-    name: "coop",
-    label: "Coop",
+    name: "syndicate",
+    label: "Syndicate",
     icon: require("@/assets/inapp-icons/Team-Share-Idea--Streamline-Ultimate.png"),
   },
   {

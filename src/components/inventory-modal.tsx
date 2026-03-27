@@ -79,7 +79,7 @@ export const InventoryModal = ({ visible, onClose }: InventoryModalProps) => {
 
   return (
     <Modal visible={visible} transparent animationType="slide">
-      <View style={[styles.container, { paddingTop: insets.top }]}>
+      <View style={[styles.container, { paddingTop: Math.max(insets.top, 20) + 8 }]}>
         {/* Top Segmented Control (Items / Boosts) */}
         <View style={styles.topTabsContainer}>
           <Pressable
@@ -219,9 +219,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     gap: 12,
-    backgroundColor: "#FFF",
-    borderBottomWidth: 1,
-    borderBottomColor: "#EFEFEF",
     justifyContent: "center",
   },
   topTab: {
