@@ -85,10 +85,7 @@ export const RanchGrid = () => {
   }, [tick]);
 
   return (
-    <ScrollView
-      contentContainerStyle={styles.container}
-      showsVerticalScrollIndicator={false}
-    >
+    <View style={styles.container}>
       <View style={styles.list}>
         {(() => {
           const list: React.ReactNode[] = [];
@@ -243,14 +240,14 @@ export const RanchGrid = () => {
           return list;
         })()}
       </View>
-    </ScrollView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
-    padding: 16,
-    paddingBottom: 10,
+    paddingVertical: 16,
+    paddingBottom: 0,
   },
   topNav: {
     flexDirection: "row",

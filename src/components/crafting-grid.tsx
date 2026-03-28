@@ -51,10 +51,7 @@ export const CraftingGrid = () => {
   };
 
   return (
-    <ScrollView
-      contentContainerStyle={styles.container}
-      showsVerticalScrollIndicator={false}
-    >
+    <View style={styles.container}>
       <View style={styles.list}>
         {Object.values(buildings).map((b) => {
           const config = BUILDINGS_CONFIG[b.id];
@@ -188,14 +185,14 @@ export const CraftingGrid = () => {
         onClose={() => setModalVisible(false)}
         buildingId={selectedBuilding}
       />
-    </ScrollView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
-    padding: 16,
-    paddingBottom: 20,
+    paddingVertical: 16,
+    paddingBottom: 0,
   },
   list: {
     gap: 16,

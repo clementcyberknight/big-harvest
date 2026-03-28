@@ -57,21 +57,25 @@ export default function HomeScreen() {
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea} edges={["left", "right"]}>
+        {/* Sub Navigation Tabs - FIXED at top like Shop */}
+        <SubTabs
+          tabs={HOME_TABS}
+          activeTabId={activeTab}
+          onTabPress={(id) => setActiveTab(id as HomeTabType)}
+        />
+
         <ScrollView
+          style={styles.scrollContainer}
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
         >
-          {/* Sub Navigation Tabs */}
-          <SubTabs
-            tabs={HOME_TABS}
-            activeTabId={activeTab}
-            onTabPress={(id) => setActiveTab(id as HomeTabType)}
-          />
-
           {/* Tab Content */}
           {activeTab === "farm" && <FarmGrid />}
           {activeTab === "ranch" && <RanchGrid />}
           {activeTab === "craft" && <CraftingGrid />}
+          
+          {/* Bottom Spacer to match Shop scroll experience */}
+          <View style={{ height: 100 }} />
         </ScrollView>
 
         {/* Floating Action Buttons */}
@@ -152,8 +156,12 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
   },
+  scrollContainer: {
+    flex: 1,
+    paddingHorizontal: 20,
+  },
   scrollContent: {
-    paddingBottom: BottomTabInset,
+    paddingTop: 8,
   },
   topActionsRow: {
     flexDirection: "row",

@@ -203,7 +203,8 @@ const styles = StyleSheet.create({
   gridContainer: {
     flexDirection: "row",
     flexWrap: "wrap",
-    padding: 16,
+    paddingVertical: 16,
+    paddingHorizontal: 0,
     justifyContent: "flex-start",
     gap: 8,
   },
