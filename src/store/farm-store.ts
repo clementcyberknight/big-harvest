@@ -18,6 +18,7 @@ interface FarmState {
   setSelectedCropId: (cropId: CropType) => void;
   plantCrop: (id: string) => void;
   harvestCrop: (id: string) => void;
+  markReady: (id: string) => void;
   buyPlot: () => void;
 }
 
@@ -108,6 +109,18 @@ export const useFarmStore = create<FarmState>((set) => ({
         plots: {
           ...state.plots,
           [id]: { ...plot, status: 'empty', cropId: undefined, plantedAt: undefined },
+        },
+      };
+    }),
+
+  markReady: (id) =>
+    set((state) => {
+      const plot = state.plots[id];
+      if (!plot || plot.status !== 'planted') return state;
+      return {
+        plots: {
+          ...state.plots,
+          [id]: { ...plot, status: 'ready' },
         },
       };
     }),

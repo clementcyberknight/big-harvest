@@ -1,13 +1,12 @@
 import { Image } from "expo-image";
-import React, { memo, useCallback } from "react";
+import React, { memo, useCallback, useEffect, useRef, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
+import { CROP_GUIDE, CropType } from "@/constants/crops";
 import { useFarmStore } from "@/store/farm-store";
 import { useGameStore } from "@/store/game-store";
-import { CROP_GUIDE, CropType } from "@/constants/crops";
 
 const soilImage = require("@/assets/image/Gemini_Generated_Image_a8azi1a8azi1a8az.png");
-const growImage = require("@/assets/image/assets_images_icons_misc_grow.webp");
 const unlockImage = require("@/assets/image/farm-plot-it.png");
 
 const cropAssets: Record<CropType, any> = {
@@ -37,236 +36,402 @@ const cropAssets: Record<CropType, any> = {
   wheat: require("@/assets/image/assets_images_icons_crops_wheat.webp"),
 };
 
-const formatCropName = (id: string) => {
-  return id.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
-};
+// ── Helpers ──────────────────────────────────────────────────────────────────
 
-const formatTime = (seconds: number) => {
-  if (seconds <= 0) return "0s";
-  const m = Math.floor(seconds / 60);
+const formatCropName = (id: string) =>
+  id.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+
+const formatTime = (seconds: number): string => {
+  if (seconds <= 0) return "Ready!";
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
   const s = Math.floor(seconds % 60);
+  if (h > 0) return `${h}h ${m}m`;
   if (m > 0) return `${m}m ${s}s`;
   return `${s}s`;
 };
 
-function useTimer(plot: any) {
-  const [remaining, setRemaining] = React.useState(0);
+// ── Timer Hook ───────────────────────────────────────────────────────────────
+// Ticks every second. When countdown hits 0 it calls onComplete exactly once.
+// This is what triggers the planted → ready transition automatically.
 
-  React.useEffect(() => {
+function useTimer(
+  plot: any,
+  onComplete: () => void,
+): { remaining: number; progress: number } {
+  const [remaining, setRemaining] = useState(0);
+  const [progress, setProgress] = useState(0);
+
+  // Use a ref so onComplete never goes stale inside the interval closure
+  const onCompleteRef = useRef(onComplete);
+  useEffect(() => {
+    onCompleteRef.current = onComplete;
+  }, [onComplete]);
+
+  // Separate ref to ensure onComplete fires only once per planting
+  const firedRef = useRef(false);
+
+  useEffect(() => {
+    firedRef.current = false; // reset every time plot changes
+
     if (plot?.status !== "planted" || !plot.plantedAt || !plot.cropId) {
       setRemaining(0);
+      setProgress(0);
       return;
     }
 
     const cropDef = CROP_GUIDE[plot.cropId as CropType];
-    const targetTime = plot.plantedAt + cropDef.growthTime * 1000;
+    if (!cropDef) return;
 
-    const update = () => {
+    const totalMs = cropDef.growthTime * 1000;
+    const targetTime = plot.plantedAt + totalMs;
+
+    const tick = () => {
       const now = Date.now();
-      const diff = Math.max(0, Math.ceil((targetTime - now) / 1000));
-      setRemaining(diff);
+      const diffMs = targetTime - now;
+      const diffSec = Math.max(0, Math.ceil(diffMs / 1000));
+      const prog = Math.min(1, Math.max(0, (now - plot.plantedAt) / totalMs));
+
+      setRemaining(diffSec);
+      setProgress(prog);
+
+      // ← THE CORE FIX: auto-transition to ready when time is up
+      if (diffSec <= 0 && !firedRef.current) {
+        firedRef.current = true;
+        onCompleteRef.current();
+      }
     };
 
-    update();
-    const interval = setInterval(update, 1000);
+    tick(); // run immediately — no blank first second
+    const interval = setInterval(tick, 1000);
     return () => clearInterval(interval);
   }, [plot?.status, plot?.plantedAt, plot?.cropId]);
 
-  return remaining;
+  return { remaining, progress };
 }
+
+// ── Progress Bar ─────────────────────────────────────────────────────────────
+
+function ProgressBar({ progress }: { progress: number }) {
+  const pct = `${Math.min(100, Math.max(0, Math.round(progress * 100)))}%` as const;
+  return (
+    <View style={styles.progressTrack}>
+      <View style={[styles.progressFill, { width: pct }]} />
+    </View>
+  );
+}
+
+// ── Farm Tile ─────────────────────────────────────────────────────────────────
 
 const FarmTile = memo(function FarmTile({ id }: { id: string }) {
   const plot = useFarmStore((state) => state.plots[id]);
   const plantCrop = useFarmStore((state) => state.plantCrop);
   const harvestCrop = useFarmStore((state) => state.harvestCrop);
-
+  const markReady = useFarmStore((state) => state.markReady);
   const addCoins = useGameStore((state) => state.addCoins);
   const addXp = useGameStore((state) => state.addXp);
 
-  const remaining = useTimer(plot);
+  // Called automatically by the timer when growthTime elapses
+  const handleTimerComplete = useCallback(() => {
+    markReady(id);
+  }, [id, markReady]);
+
+  const { remaining, progress } = useTimer(plot, handleTimerComplete);
 
   const handlePress = useCallback(() => {
     if (!plot) return;
-
     if (plot.status === "empty") {
       plantCrop(plot.id);
-    } else if (plot.status === "planted") {
-      // Potentially show "Still growing" or "Speed up"
-      if (remaining <= 0) {
-        // Fallback if the timer didn't catch the transition
-        harvestCrop(plot.id);
-        addCoins(10);
-        addXp(5);
-      }
     } else if (plot.status === "ready") {
       harvestCrop(plot.id);
       addCoins(10);
       addXp(5);
     }
-  }, [plot, plantCrop, harvestCrop, addCoins, addXp, remaining]);
+    // "planted" tiles: no tap action — timer drives the transition
+  }, [plot, plantCrop, harvestCrop, addCoins, addXp]);
 
   if (!plot) return null;
 
-  return (
-    <Pressable style={styles.tileWrapper} onPress={handlePress}>
-      <View
-        style={[
-          styles.tileContainer,
-          plot.status === "empty" ? styles.emptyPlotContainer : null,
-          plot.status === "ready" ? styles.readyPlotContainer : null,
-        ]}
-      >
-        {plot.status === "empty" && (
-          <Image
-            source={soilImage}
-            style={StyleSheet.absoluteFillObject}
-            contentFit="cover"
-            cachePolicy="memory-disk"
-          />
-        )}
-
-        {plot.status === "planted" && plot.cropId && (
-          <View style={styles.readyContent}>
+  // ── EMPTY ────────────────────────────────────────────────────────────────
+  if (plot.status === "empty") {
+    return (
+      <Pressable style={styles.tileWrapper} onPress={handlePress}>
+        {({ pressed }) => (
+          <View
+            style={[
+              styles.tile,
+              styles.tileEmpty,
+              pressed && styles.tilePressed,
+            ]}
+          >
             <Image
-              source={cropAssets[plot.cropId]}
-              style={[styles.cropImageReady, { opacity: 0.5 }]}
-              contentFit="contain"
+              source={soilImage}
+              style={StyleSheet.absoluteFillObject}
+              contentFit="cover"
               cachePolicy="memory-disk"
             />
-            <Text
-              style={styles.readyCropName}
-              numberOfLines={1}
-              adjustsFontSizeToFit
-            >
-              {formatCropName(plot.cropId)}
-            </Text>
-            <Text style={styles.timerText}>
-              {remaining > 0 ? formatTime(remaining) : "Ready!"}
-            </Text>
+            <View style={styles.emptyOverlay}>
+              <Text style={styles.emptyIcon}>＋</Text>
+            </View>
           </View>
         )}
+      </Pressable>
+    );
+  }
 
-        {plot.status === "ready" && plot.cropId && (
-          <View style={styles.readyContent}>
+  // ── PLANTED ───────────────────────────────────────────────────────────────
+  if (plot.status === "planted" && plot.cropId) {
+    const cropId = plot.cropId;
+    const isAlmostReady = remaining <= 30 && remaining > 0;
+    return (
+      <Pressable style={styles.tileWrapper} onPress={undefined}>
+        <View
+          style={[
+            styles.tile,
+            styles.tilePlanted,
+            isAlmostReady && styles.tileAlmostReady,
+          ]}
+        >
+          <Image
+            source={cropAssets[cropId]}
+            style={styles.cropImage}
+            contentFit="contain"
+            cachePolicy="memory-disk"
+          />
+          <Text style={styles.cropName} numberOfLines={1} adjustsFontSizeToFit>
+            {formatCropName(cropId)}
+          </Text>
+          <ProgressBar progress={progress} />
+          <Text style={styles.timerText}>{formatTime(remaining)}</Text>
+        </View>
+      </Pressable>
+    );
+  }
+
+  // ── READY ─────────────────────────────────────────────────────────────────
+  if (plot.status === "ready" && plot.cropId) {
+    const cropId = plot.cropId;
+    return (
+      <Pressable style={styles.tileWrapper} onPress={handlePress}>
+        {({ pressed }) => (
+          <View
+            style={[
+              styles.tile,
+              styles.tileReady,
+              pressed && styles.tilePressed,
+            ]}
+          >
+            <View style={styles.readyGlow} />
             <Image
-              source={cropAssets[plot.cropId]}
+              source={cropAssets[cropId]}
               style={styles.cropImageReady}
               contentFit="contain"
               cachePolicy="memory-disk"
             />
             <Text
-              style={styles.readyCropName}
+              style={styles.cropName}
               numberOfLines={1}
               adjustsFontSizeToFit
             >
-              {formatCropName(plot.cropId)}
+              {formatCropName(cropId)}
             </Text>
-            <Text style={styles.readyLabel}>Ready!</Text>
+            <View style={styles.readyBadge}>
+              <Text style={styles.readyBadgeText}>HARVEST</Text>
+            </View>
           </View>
         )}
-      </View>
-    </Pressable>
-  );
+      </Pressable>
+    );
+  }
+
+  return null;
 });
+
+// ── Buy Plot Tile ─────────────────────────────────────────────────────────────
 
 const BuyPlotTile = memo(function BuyPlotTile() {
   const buyPlot = useFarmStore((state) => state.buyPlot);
 
   return (
     <Pressable style={styles.tileWrapper} onPress={buyPlot}>
-      <View style={[styles.tileContainer, styles.buyPlotContainer]}>
-        <Image
-          source={unlockImage}
-          style={styles.cropImageFull}
-          contentFit="contain"
-          cachePolicy="memory-disk"
-        />
-      </View>
+      {({ pressed }) => (
+        <View
+          style={[styles.tile, styles.tileBuy, pressed && styles.tilePressed]}
+        >
+          <Image
+            source={unlockImage}
+            style={styles.buyImage}
+            contentFit="contain"
+            cachePolicy="memory-disk"
+          />
+          <Text style={styles.buyText}>Unlock</Text>
+        </View>
+      )}
     </Pressable>
   );
 });
+
+// ── Farm Grid ─────────────────────────────────────────────────────────────────
 
 export const FarmGrid = memo(function FarmGrid() {
   const plotIds = useFarmStore((state) => state.plotIds);
 
   return (
-    <View style={styles.gridContainer}>
-      {Array.isArray(plotIds) && plotIds.map((id) => (
-        <FarmTile key={id} id={id} />
-      ))}
+    <View style={styles.grid}>
+      {Array.isArray(plotIds) &&
+        plotIds.map((id) => <FarmTile key={id} id={id} />)}
       {plotIds.length < 32 && <BuyPlotTile />}
     </View>
   );
 });
 
+// ── Styles ────────────────────────────────────────────────────────────────────
+
 const styles = StyleSheet.create({
-  gridContainer: {
+  grid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    paddingVertical: 16,
-    paddingHorizontal: 0,
-    justifyContent: "flex-start",
     gap: 8,
+    paddingVertical: 4,
+    justifyContent: "flex-start",
   },
   tileWrapper: {
-    width: "22%", // 4 columns with gap
-    aspectRatio: 1, // Keep it square
+    width: "22.5%",
+    aspectRatio: 1,
   },
-  tileContainer: {
+  tile: {
     flex: 1,
-    backgroundColor: "#E6D7C3",
-    borderRadius: 8,
-    borderWidth: 2,
-    borderColor: "#C3A482",
-    borderStyle: "dashed",
+    borderRadius: 14,
     alignItems: "center",
     justifyContent: "center",
-    padding: 8,
+    padding: 6,
     overflow: "hidden",
+    borderWidth: 1.5,
   },
-  emptyPlotContainer: {
+  tilePressed: {
+    opacity: 0.82,
+    transform: [{ scale: 0.96 }],
+  },
+
+  // Empty
+  tileEmpty: {
     backgroundColor: "transparent",
+    borderColor: "rgba(180,140,90,0.5)",
+    borderStyle: "dashed",
     padding: 0,
   },
-  readyPlotContainer: {
-    backgroundColor: "#E8F5E9",
-    borderColor: "#81C784",
-    borderStyle: "solid",
-    padding: 4,
-  },
-  buyPlotContainer: {
-    backgroundColor: "#FAF5EE",
-    opacity: 0.8,
-  },
-  readyContent: {
+  emptyOverlay: {
+    ...StyleSheet.absoluteFillObject,
     alignItems: "center",
     justifyContent: "center",
-    flex: 1,
-    width: "100%",
+    backgroundColor: "rgba(0,0,0,0.08)",
   },
-  cropImageFull: {
-    width: "100%",
-    height: "100%",
+  emptyIcon: {
+    fontSize: 22,
+    color: "rgba(255,255,255,0.85)",
+    fontWeight: "700",
+    lineHeight: 26,
+  },
+
+  // Planted
+  tilePlanted: {
+    backgroundColor: "#FFFBF0",
+    borderColor: "rgba(255,176,56,0.35)",
+    borderStyle: "solid",
+    gap: 3,
+  },
+  tileAlmostReady: {
+    backgroundColor: "#F0FBE8",
+    borderColor: "rgba(113,179,18,0.45)",
+  },
+  cropImage: {
+    width: "62%",
+    height: "42%",
+    opacity: 0.72,
+  },
+
+  // Ready
+  tileReady: {
+    backgroundColor: "#F0FBE8",
+    borderColor: "#71B312",
+    borderStyle: "solid",
+    borderWidth: 2,
+    gap: 3,
+  },
+  readyGlow: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderRadius: 13,
+    backgroundColor: "rgba(113,179,18,0.08)",
   },
   cropImageReady: {
-    width: "60%",
-    height: "50%",
+    width: "65%",
+    height: "44%",
   },
-  readyCropName: {
-    fontSize: 10,
-    fontWeight: "800",
-    color: "#333",
-    marginTop: 2,
+  readyBadge: {
+    backgroundColor: "#71B312",
+    borderRadius: 5,
+    paddingHorizontal: 5,
+    paddingVertical: 2,
   },
-  readyLabel: {
-    fontSize: 10,
-    fontWeight: "800",
-    color: "#4CAF50",
+  readyBadgeText: {
+    fontSize: 7,
+    fontFamily: "Space Mono",
+    fontWeight: "700",
+    color: "white",
+    letterSpacing: 0.4,
+  },
+
+  // Buy / Unlock
+  tileBuy: {
+    backgroundColor: "#FAF7F2",
+    borderColor: "rgba(3,32,24,0.12)",
+    borderStyle: "dashed",
+    gap: 3,
+  },
+  buyImage: {
+    width: "55%",
+    height: "45%",
+    opacity: 0.5,
+  },
+  buyText: {
+    fontSize: 9,
+    fontFamily: "Space Mono",
+    fontWeight: "700",
+    color: "rgba(3,32,24,0.35)",
+    letterSpacing: 0.3,
+  },
+
+  // Shared text
+  cropName: {
+    fontSize: 9,
+    fontFamily: "Space Mono",
+    fontWeight: "700",
+    color: "#032018",
+    width: "100%",
+    textAlign: "center",
   },
   timerText: {
-    fontSize: 10,
-    fontWeight: "600",
-    color: "#666",
-    marginTop: 2,
+    fontSize: 9,
+    fontFamily: "Space Mono",
+    color: "rgba(3,32,24,0.50)",
+    textAlign: "center",
+  },
+
+  // Progress bar
+  progressTrack: {
+    width: "85%",
+    height: 4,
+    backgroundColor: "rgba(3,32,24,0.08)",
+    borderRadius: 3,
+    overflow: "hidden",
+  },
+  progressFill: {
+    height: "100%",
+    backgroundColor: "#71B312",
+    borderRadius: 3,
   },
 });
