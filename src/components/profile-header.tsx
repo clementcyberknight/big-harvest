@@ -1,7 +1,8 @@
 import { Image } from "expo-image";
 import React, { memo } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View, Pressable } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useRouter } from "expo-router";
 
 import { useGameStore } from "@/store/game-store";
 
@@ -182,19 +183,23 @@ export const ProfileHeader = memo(function ProfileHeader() {
   const diamonds = useGameStore((state) => state.diamonds);
   
   const insets = useSafeAreaInsets();
+  const router = useRouter();
 
   const xpProgress = xpToNextLevel > 0 ? xp / xpToNextLevel : 0;
 
   return (
     <View style={[styles.wrapper, { paddingTop: Math.max(insets.top, 20) + 4 }]}>
-      {/* Left: avatar + level */}
-      <View style={styles.leftSection}>
+      {/* Left: avatar + level - CLICKABLE */}
+      <Pressable 
+        style={styles.leftSection}
+        onPress={() => router.push("/profile")}
+      >
         <XpRing progress={xpProgress} />
         <View style={styles.levelContainer}>
           <Text style={styles.levelLabel}>Level</Text>
           <Text style={styles.levelValue}>{level}</Text>
         </View>
-      </View>
+      </Pressable>
 
       {/* Right: currency pills stacked */}
       <View style={styles.rightSection}>
