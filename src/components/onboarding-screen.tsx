@@ -22,9 +22,9 @@ import nacl from "tweetnacl";
 import { AuthenticatingModal } from "@/components/authenticating-modal";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
+import { getAuthChallenge, verifyWalletSignature } from "@/services/auth-api";
 import { connectGameSocket } from "@/services/ws-client";
 import { useAppStore } from "@/store/app-store";
-import { getAuthChallenge, verifyWalletSignature } from "@/services/auth-api";
 import { useAuthStore } from "@/store/auth-store";
 import { useWalletStore } from "@/store/wallet-store";
 
@@ -62,9 +62,9 @@ const ONBOARDING_DATA = [
 export function OnboardingScreen() {
   const [index, setIndex] = useState(0);
   const [isAuthenticating, setIsAuthenticating] = useState(false);
-  const [authMode, setAuthMode] = useState<"authenticating" | "creating_wallet">(
-    "authenticating",
-  );
+  const [authMode, setAuthMode] = useState<
+    "authenticating" | "creating_wallet"
+  >("authenticating");
   const completeOnboarding = useAppStore((state) => state.completeOnboarding);
   const setSeekerAuthenticated = useWalletStore(
     (state) => state.setSeekerAuthenticated,
@@ -266,7 +266,8 @@ const styles = StyleSheet.create({
     height: 380,
     marginHorizontal: 16,
     marginTop: 16,
-    borderRadius: 4,
+    borderTopLeftRadius: 25,
+    borderTopRightRadius: 25,
     overflow: "hidden",
     backgroundColor: "#DEE5D6",
   },

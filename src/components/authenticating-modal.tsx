@@ -28,7 +28,6 @@ export const AuthenticatingModal = ({
       <View style={styles.overlay}>
         <View style={styles.dismissArea} />
         <View style={styles.content}>
-          <View style={styles.handle} />
           <ActivityIndicator size="large" color="#0D631B" />
           <Text style={styles.title}>{title}</Text>
           <Text style={styles.subtitle}>{subtitle}</Text>
@@ -57,13 +56,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     minHeight: 250,
     justifyContent: "center",
-  },
-  handle: {
-    width: 42,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: "#E0E0E0",
-    marginBottom: 24,
   },
   title: {
     marginTop: 14,
