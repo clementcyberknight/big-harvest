@@ -1,0 +1,81 @@
+import React from "react";
+import {
+  ActivityIndicator,
+  Modal,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
+
+interface AuthenticatingModalProps {
+  visible: boolean;
+  mode: "authenticating" | "creating_wallet";
+}
+
+export const AuthenticatingModal = ({
+  visible,
+  mode,
+}: AuthenticatingModalProps) => {
+  const title =
+    mode === "creating_wallet" ? "Creating wallet" : "Authenticating";
+  const subtitle =
+    mode === "creating_wallet"
+      ? "Setting up your secure Solana wallet..."
+      : "Checking your Seeker status...";
+
+  return (
+    <Modal visible={visible} transparent animationType="slide">
+      <View style={styles.overlay}>
+        <View style={styles.dismissArea} />
+        <View style={styles.content}>
+          <View style={styles.handle} />
+          <ActivityIndicator size="large" color="#0D631B" />
+          <Text style={styles.title}>{title}</Text>
+          <Text style={styles.subtitle}>{subtitle}</Text>
+        </View>
+      </View>
+    </Modal>
+  );
+};
+
+const styles = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "flex-end",
+  },
+  dismissArea: {
+    flex: 1,
+  },
+  content: {
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
+    backgroundColor: "#FFFFFF",
+    paddingTop: 12,
+    paddingBottom: 28,
+    paddingHorizontal: 24,
+    alignItems: "center",
+    minHeight: 250,
+    justifyContent: "center",
+  },
+  handle: {
+    width: 42,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: "#E0E0E0",
+    marginBottom: 24,
+  },
+  title: {
+    marginTop: 14,
+    fontSize: 30,
+    fontWeight: "900",
+    color: "#032018",
+  },
+  subtitle: {
+    marginTop: 8,
+    fontSize: 15,
+    fontWeight: "500",
+    color: "#6C6C6C",
+    textAlign: "center",
+  },
+});
