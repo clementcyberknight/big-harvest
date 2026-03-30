@@ -1,4 +1,5 @@
 import { useMobileWallet } from "@wallet-ui/react-native-web3js";
+import bs58 from "bs58";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import React, { useState } from "react";
@@ -16,11 +17,15 @@ import Animated, {
   SlideOutDown,
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import nacl from "tweetnacl";
 
 import { AuthenticatingModal } from "@/components/authenticating-modal";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
+import { connectGameSocket } from "@/services/ws-client";
 import { useAppStore } from "@/store/app-store";
+import { getAuthChallenge, verifyWalletSignature } from "@/services/auth-api";
+import { useAuthStore } from "@/store/auth-store";
 import { useWalletStore } from "@/store/wallet-store";
 
 const ONBOARDING_DATA = [
@@ -65,7 +70,11 @@ export function OnboardingScreen() {
     (state) => state.setSeekerAuthenticated,
   );
   const createLocalWallet = useWalletStore((state) => state.createLocalWallet);
-  const { signIn } = useMobileWallet();
+  const getLocalWalletSecretKey = useWalletStore(
+    (state) => state.getLocalWalletSecretKey,
+  );
+  const setSession = useAuthStore((state) => state.setSession);
+  const { account, connect, signMessage } = useMobileWallet();
   const insets = useSafeAreaInsets();
 
   const currentSlide = ONBOARDING_DATA[index];
@@ -89,17 +98,39 @@ export function OnboardingScreen() {
 
     setIsAuthenticating(true);
     try {
+      const challenge = await getAuthChallenge();
+      const challengePayload = new TextEncoder().encode(challenge.message);
+
       if (isSeekerDevice()) {
         setAuthMode("authenticating");
-        await signIn({
-          domain: "ravolo.app",
-          statement: "Sign in to Ravolo with your Seeker wallet",
-          uri: "https://ravolo.app",
+        const connectedAccount = account ?? (await connect());
+        const signatureBytes = await signMessage(challengePayload);
+        const authResult = await verifyWalletSignature({
+          wallet: connectedAccount.address.toBase58(),
+          signature: bs58.encode(signatureBytes),
+          challengeId: challenge.challengeId,
         });
+
+        await setSession(authResult);
+        connectGameSocket(authResult.accessToken);
         setSeekerAuthenticated(true);
       } else {
         setAuthMode("creating_wallet");
-        await createLocalWallet();
+        const wallet = await createLocalWallet();
+        const localSecretKey = await getLocalWalletSecretKey();
+        if (!localSecretKey) {
+          throw new Error("Local wallet private key is missing");
+        }
+
+        const signature = nacl.sign.detached(challengePayload, localSecretKey);
+        const authResult = await verifyWalletSignature({
+          wallet: wallet.address,
+          signature: bs58.encode(signature),
+          challengeId: challenge.challengeId,
+        });
+
+        await setSession(authResult);
+        connectGameSocket(authResult.accessToken);
         setSeekerAuthenticated(false);
       }
 
