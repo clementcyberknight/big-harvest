@@ -1,9 +1,12 @@
 import { ASSET_MAP } from "@/components/inventory-modal";
+import { websocketManager } from "@/services/websocket-manager";
 import { useGameStore } from "@/store/game-store";
 import { useInventoryStore } from "@/store/inventory-store";
+import { useMarketStore } from "@/store/market-store";
 import { Image } from "expo-image";
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import {
+  Alert,
   Modal,
   Pressable,
   ScrollView,
@@ -17,6 +20,89 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 const coinIcon = require("@/assets/image/assets_images_icons_misc_coins.webp");
 const diamondIcon = require("@/assets/image/assets_images_icons_misc_diamonds.webp");
 const closeIconSvg = require("@/assets/inapp-icons/x-close.svg");
+
+const SEEDLING_ASSET_MAP: Record<string, any> = {
+  "seed:cacao": require("@/assets/seedlings/cacao_seedling.png"),
+  "seed:carrot": require("@/assets/seedlings/carrot_seedling.png"),
+  "seed:chili": require("@/assets/seedlings/chile_seedling.png"),
+  "seed:coffee": require("@/assets/seedlings/coffee_beans.png"),
+  "seed:corn": require("@/assets/seedlings/corn_seedling.png"),
+  "seed:cotton": require("@/assets/seedlings/cotton_seedling.png"),
+  "seed:grapes": require("@/assets/seedlings/grape_seedling.png"),
+  "seed:lavender": require("@/assets/seedlings/lavender_seedling.png"),
+  "seed:mud_pit": require("@/assets/seedlings/mud_pit.png"),
+  "seed:oat": require("@/assets/seedlings/oat_seedling.png"),
+  "seed:onion": require("@/assets/seedlings/onion_seedling.png"),
+  "seed:pepper": require("@/assets/seedlings/pepper_seedling.png"),
+  "seed:potato": require("@/assets/seedlings/potato_seedling.png"),
+  "seed:rice": require("@/assets/seedlings/rice_seedling.png"),
+  "seed:saffron": require("@/assets/seedlings/saffron_seedling.png"),
+  "seed:sapling": require("@/assets/seedlings/sapling_patch.png"),
+  "seed:soybean": require("@/assets/seedlings/soyabeans_seedling.png"),
+  "seed:strawberry": require("@/assets/seedlings/strawberry_seedling.png"),
+  "seed:sugarcane": require("@/assets/seedlings/sugarcane_seedling.png"),
+  "seed:sunflower": require("@/assets/seedlings/sunflower_seedling.png"),
+  "seed:tea": require("@/assets/seedlings/tea_leaves.png"),
+  "seed:tomato": require("@/assets/seedlings/tomatoes_seedling.png"),
+  "seed:vanilla": require("@/assets/seedlings/vanilla_seedling.png"),
+  "seed:wheat": require("@/assets/seedlings/wheat_seedling.png"),
+};
+
+const MARKET_ASSET_MAP: Record<string, any> = {
+  ...ASSET_MAP,
+  "animal:chicken": require("@/assets/image/assets_images_icons_animals_chicken_coop.webp"),
+  "animal:cow": require("@/assets/image/assets_images_icons_animals_cow_shed.webp"),
+  "animal:goat": require("@/assets/image/assets_images_icons_animals_goat_farm.webp"),
+  "animal:pig": require("@/assets/image/assets_images_icons_animals_pigsty.webp"),
+  "animal:sheep": require("@/assets/image/assets_images_icons_animals_sheep_farm.webp"),
+  "animal:silkworm": require("@/assets/image/assets_images_icons_animals_silkworm_house.webp"),
+  "animal:bee": require("@/assets/image/assets_images_icons_animals_apiary.webp"),
+  beef: require("@/assets/image/assets_images_icons_animalproducts_pork.webp"),
+  chicken_meat: require("@/assets/image/assets_images_icons_animalproducts_egg.webp"),
+  goat_meat: require("@/assets/image/assets_images_icons_animalproducts_goat_milk.webp"),
+  cocoa_pods: require("@/assets/image/assets_images_icons_areaitems_cacao_pod.webp"),
+  grape: require("@/assets/image/assets_images_icons_crops_grapes.webp"),
+  sapling: require("@/assets/image/assets_images_icons_crops_sapling_patch.webp"),
+  mud: require("@/assets/image/assets_images_icons_crops_mud_pit.webp"),
+  sunflower_seeds: require("@/assets/image/assets_images_icons_areaitems_sunflower_seed.webp"),
+  "craft:flour": require("@/assets/image/assets_images_icons_crafts_flour.webp"),
+  "craft:cake": require("@/assets/image/assets_images_icons_crafts_cake.webp"),
+  "craft:chocolate": require("@/assets/image/assets_images_icons_crafts_chocolate.webp"),
+  "craft:coffee": require("@/assets/image/assets_images_icons_crops_coffee_beans.webp"),
+  "craft:cheese": require("@/assets/image/assets_images_icons_crafts_cheese.webp"),
+  "craft:butter": require("@/assets/image/assets_images_icons_crafts_butter.webp"),
+  "craft:jam": require("@/assets/image/assets_images_icons_crafts_blueberry_jam.webp"),
+  "craft:oil": require("@/assets/image/assets_images_icons_crafts_sunflower_oil.webp"),
+  "craft:cloth": require("@/assets/image/assets_images_icons_crafts_artisan_tapestry.webp"),
+  "craft:wine": require("@/assets/image/assets_images_icons_crafts_grape_wine.webp"),
+  "tool:bakery": require("@/assets/image/assets_images_icons_buildings_bakery.webp"),
+  "tool:mill": require("@/assets/image/assets_images_icons_buildings_mill.webp"),
+  "tool:slaughter_house": require("@/assets/image/assets_images_icons_buildings_smoker.webp"),
+  "tool:cheese_factory": require("@/assets/image/assets_images_icons_buildings_creamery.webp"),
+  "tool:butter_churn": require("@/assets/image/assets_images_icons_buildings_dairy.webp"),
+  "tool:winery": require("@/assets/image/assets_images_icons_buildings_distillery.webp"),
+  "tool:oil_press": require("@/assets/image/assets_images_icons_buildings_oil_press.webp"),
+  "tool:chocolate_processor": require("@/assets/image/assets_images_icons_buildings_confectioner.webp"),
+  "tool:jam_station": require("@/assets/image/assets_images_icons_buildings_jam_house.webp"),
+};
+
+function formatMarketName(id: string) {
+  const raw = id.startsWith("seed:") ? id.slice("seed:".length) : id;
+  return raw
+    .replace(/^craft:/, "")
+    .replace(/^animal:/, "")
+    .replace(/^tool:/, "")
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function getMarketAsset(id: string) {
+  return SEEDLING_ASSET_MAP[id] || MARKET_ASSET_MAP[id] || coinIcon;
+}
+
+function generateRequestId() {
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
 
 // ------------------------ MOCK DATA ------------------------
 const PLAYER_SALES = [
@@ -164,6 +250,11 @@ export const MarketModal = ({ visible, onClose }: MarketModalProps) => {
   );
   const [saleQuantity, setSaleQuantity] = useState(0);
   const [salePrice, setSalePrice] = useState(0);
+  const [activeMarketActionId, setActiveMarketActionId] = useState<string | null>(null);
+  const [buyModalItemId, setBuyModalItemId] = useState<string | null>(null);
+  const [buyModalQuantity, setBuyModalQuantity] = useState(1);
+  const [sellModalItemId, setSellModalItemId] = useState<string | null>(null);
+  const [sellModalQuantity, setSellModalQuantity] = useState(1);
 
   // Create Request State
   const [isCreatingRequest, setIsCreatingRequest] = useState(false);
@@ -173,8 +264,7 @@ export const MarketModal = ({ visible, onClose }: MarketModalProps) => {
   const [requestSearchQuery, setRequestSearchQuery] = useState("");
 
   const coins = useGameStore((state) => state.coins);
-  const removeCoins = useGameStore((state) => state.removeCoins);
-  const addCoins = useGameStore((state) => state.addCoins);
+  const marketPrices = useMarketStore((state) => state.prices);
 
   const inventoryItems = useInventoryStore((state) => state.items);
   const inventoryList = Object.values(inventoryItems).filter(
@@ -183,26 +273,213 @@ export const MarketModal = ({ visible, onClose }: MarketModalProps) => {
   const maxSaleQuantity = selectedInventoryId
     ? inventoryItems[selectedInventoryId]?.quantity || 0
     : 0;
+  const sellModalAvailableQuantity = sellModalItemId
+    ? inventoryItems[sellModalItemId]?.quantity || 0
+    : 0;
+  const liveMarketItems = useMemo(
+    () =>
+      Object.entries(marketPrices)
+        .map(([id, price]) => ({
+          id,
+          item: id,
+          name: id.startsWith("seed:")
+            ? `${formatMarketName(id)} Seeds`
+            : formatMarketName(id),
+          buy: price.buy,
+          sell: price.sell,
+          image: getMarketAsset(id),
+          isSeed: id.startsWith("seed:"),
+        }))
+        .sort((a, b) => a.name.localeCompare(b.name)),
+    [marketPrices],
+  );
+  const buyModalItem = buyModalItemId
+    ? liveMarketItems.find((item) => item.id === buyModalItemId) || null
+    : null;
+  const buyModalMaxQuantity = buyModalItem
+    ? Math.max(1, Math.floor(coins / Math.max(1, buyModalItem.buy)))
+    : 1;
+  const sellModalItem = sellModalItemId
+    ? liveMarketItems.find((item) => item.id === sellModalItemId) || null
+    : null;
 
   // Render merchant/cosmetics
   const handlePurchaseCosmetic = (item: any) => {
     if (coins >= item.price) {
-      removeCoins(item.price);
+      useGameStore.getState().removeCoins(item.price);
       alert(`Purchased ${item.name}!`);
     } else {
       alert("Not enough coins!");
     }
   };
 
-  const submitSale = () => {
-    if (!selectedInventoryId || saleQuantity <= 0 || salePrice <= 0) return;
-    useInventoryStore
-      .getState()
-      .removeResource(selectedInventoryId, saleQuantity);
-    alert(
-      `Listed ${saleQuantity} ${selectedInventoryId} for ${saleQuantity * salePrice} coins!`,
+  const submitSale = async () => {
+    if (!selectedInventoryId || saleQuantity <= 0) return;
+
+    const requestId = generateRequestId();
+    setActiveMarketActionId(`sell:${selectedInventoryId}`);
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const unsubscribe = websocketManager.onMessage((message) => {
+          if (message.type === "SELL_OK") {
+            unsubscribe();
+            resolve();
+            return;
+          }
+
+          if (message.type === "ERROR") {
+            unsubscribe();
+            reject(new Error(message.message || message.code || "SELL_FAILED"));
+          }
+        });
+
+        websocketManager
+          .send(
+            "SELL",
+            {
+              item: selectedInventoryId,
+              quantity: saleQuantity,
+              requestId,
+            },
+            false,
+          )
+          .catch((error) => {
+            unsubscribe();
+            reject(error);
+          });
+      });
+
+      setIsCreatingSale(false);
+      setSelectedInventoryId(null);
+      setSaleQuantity(0);
+      setSalePrice(0);
+    } catch (error) {
+      Alert.alert("Sell failed", error instanceof Error ? error.message : "Unable to sell item.");
+    } finally {
+      setActiveMarketActionId(null);
+    }
+  };
+
+  const handleBuyMarketItem = async (itemId: string, quantity: number) => {
+    const marketItem = liveMarketItems.find((item) => item.id === itemId);
+    const maxAffordableQuantity = marketItem
+      ? Math.max(1, Math.floor(coins / Math.max(1, marketItem.buy)))
+      : 1;
+    const safeQuantity = Math.max(1, Math.min(quantity, maxAffordableQuantity));
+    const requestId = generateRequestId();
+    setActiveMarketActionId(`buy:${itemId}`);
+
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const unsubscribe = websocketManager.onMessage((message) => {
+          if (message.type === "BUY_OK") {
+            unsubscribe();
+            resolve();
+            return;
+          }
+
+          if (message.type === "ERROR") {
+            unsubscribe();
+            reject(new Error(message.message || message.code || "BUY_FAILED"));
+          }
+        });
+
+        websocketManager
+          .send(
+            "BUY",
+            {
+              item: itemId,
+              quantity: safeQuantity,
+              requestId,
+            },
+            false,
+          )
+          .catch((error) => {
+            unsubscribe();
+            reject(error);
+          });
+      });
+      await websocketManager.send("GET_GAME_STATE", undefined, false);
+    } catch (error) {
+      Alert.alert("Buy failed", error instanceof Error ? error.message : "Unable to buy item.");
+    } finally {
+      setActiveMarketActionId(null);
+    }
+  };
+
+  const openBuyModal = (itemId: string) => {
+    const marketItem = liveMarketItems.find((item) => item.id === itemId);
+    if (!marketItem) {
+      return;
+    }
+
+    const maxAffordableQuantity = Math.max(
+      0,
+      Math.floor(coins / Math.max(1, marketItem.buy)),
     );
-    setIsCreatingSale(false);
+
+    setBuyModalItemId(itemId);
+    setBuyModalQuantity(Math.max(1, maxAffordableQuantity || 1));
+  };
+
+  const handleSellMarketItem = async (itemId: string, quantity: number) => {
+    const ownedQuantity = inventoryItems[itemId]?.quantity || 0;
+    const safeQuantity = Math.max(1, Math.min(quantity, ownedQuantity));
+    if (ownedQuantity <= 0) {
+      Alert.alert("Nothing to sell", `You do not have any ${formatMarketName(itemId)} to sell.`);
+      return;
+    }
+
+    const requestId = generateRequestId();
+    setActiveMarketActionId(`sell:${itemId}`);
+
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const unsubscribe = websocketManager.onMessage((message) => {
+          if (message.type === "SELL_OK") {
+            unsubscribe();
+            resolve();
+            return;
+          }
+
+          if (message.type === "ERROR") {
+            unsubscribe();
+            reject(new Error(message.message || message.code || "SELL_FAILED"));
+          }
+        });
+
+        websocketManager
+          .send(
+            "SELL",
+            {
+              item: itemId,
+              quantity: safeQuantity,
+              requestId,
+            },
+            false,
+          )
+          .catch((error) => {
+            unsubscribe();
+            reject(error);
+          });
+      });
+      await websocketManager.send("GET_GAME_STATE", undefined, false);
+    } catch (error) {
+      Alert.alert("Sell failed", error instanceof Error ? error.message : "Unable to sell item.");
+    } finally {
+      setActiveMarketActionId(null);
+    }
+  };
+
+  const openSellModal = (itemId: string) => {
+    const ownedQuantity = inventoryItems[itemId]?.quantity || 0;
+    if (ownedQuantity <= 0) {
+      Alert.alert("Nothing to sell", `You do not have any ${formatMarketName(itemId)} to sell.`);
+      return;
+    }
+
+    setSellModalItemId(itemId);
+    setSellModalQuantity(1);
   };
 
   const submitRequest = () => {
@@ -211,7 +488,7 @@ export const MarketModal = ({ visible, onClose }: MarketModalProps) => {
       alert("Not enough coins for Escrow.");
       return;
     }
-    removeCoins(cost);
+    useGameStore.getState().removeCoins(cost);
     alert(
       `Requested ${requestQuantity} ${requestItemId} for ${cost} total coins!`,
     );
@@ -297,7 +574,7 @@ export const MarketModal = ({ visible, onClose }: MarketModalProps) => {
 
   const renderAllSalesTab = () => (
     <View style={styles.listContainer}>
-      {PLAYER_SALES.map((sale) => (
+      {liveMarketItems.map((sale) => (
         <View key={sale.id} style={styles.playerSaleCard}>
           <View style={styles.cardLeft}>
             <Image
@@ -307,21 +584,50 @@ export const MarketModal = ({ visible, onClose }: MarketModalProps) => {
             />
             <View style={styles.cardInfo}>
               <Text style={styles.saleItemTitle}>
-                {sale.name}{" "}
-                <Text style={styles.saleItemQty}>x{sale.quantity}</Text>
+                {sale.name}
               </Text>
-              <Text style={styles.sellerName}>{sale.seller}</Text>
+              <Text style={styles.sellerName}>
+                {sale.isSeed ? "Seedling" : "Marketplace"}
+              </Text>
             </View>
           </View>
-          <View style={styles.salePriceBox}>
-            <Text style={styles.salePriceText}>
-              {sale.price.toLocaleString()}
-            </Text>
-            <Image
-              source={coinIcon}
-              style={styles.buyButtonIcon}
-              contentFit="contain"
-            />
+          <View style={styles.marketPriceColumn}>
+            <Pressable
+              style={[
+                styles.salePriceBox,
+                activeMarketActionId === `buy:${sale.id}` && styles.buyButtonDisabled,
+              ]}
+              onPress={() => openBuyModal(sale.id)}
+              disabled={activeMarketActionId === `buy:${sale.id}`}
+            >
+              <Text style={styles.salePriceLabel}>Buy</Text>
+              <Text style={styles.salePriceText}>{sale.buy.toLocaleString()}</Text>
+              <Image
+                source={coinIcon}
+                style={styles.buyButtonIcon}
+                contentFit="contain"
+              />
+            </Pressable>
+            <Pressable
+              style={[
+                styles.salePriceBox,
+                (inventoryItems[sale.id]?.quantity || 0) <= 0 && styles.buyButtonDisabled,
+                activeMarketActionId === `sell:${sale.id}` && styles.buyButtonDisabled,
+              ]}
+              onPress={() => openSellModal(sale.id)}
+              disabled={
+                (inventoryItems[sale.id]?.quantity || 0) <= 0 ||
+                activeMarketActionId === `sell:${sale.id}`
+              }
+            >
+              <Text style={styles.salePriceLabel}>Sell</Text>
+              <Text style={styles.salePriceText}>{sale.sell.toLocaleString()}</Text>
+              <Image
+                source={coinIcon}
+                style={styles.buyButtonIcon}
+                contentFit="contain"
+              />
+            </Pressable>
           </View>
         </View>
       ))}
@@ -558,11 +864,17 @@ export const MarketModal = ({ visible, onClose }: MarketModalProps) => {
                 styles.finalPutSaleBtn,
                 (saleQuantity <= 0 || salePrice <= 0) &&
                   styles.finalPutSaleBtnDisabled,
+                activeMarketActionId === `sell:${selectedInventoryId}` &&
+                  styles.finalPutSaleBtnDisabled,
               ]}
               onPress={submitSale}
+              disabled={
+                saleQuantity <= 0 ||
+                activeMarketActionId === `sell:${selectedInventoryId}`
+              }
             >
               <Text style={styles.finalPutSaleBtnText}>
-                Put on sale for {saleQuantity * salePrice}
+                Sell to treasury
               </Text>
               <Image
                 source={coinIcon}
@@ -775,6 +1087,295 @@ export const MarketModal = ({ visible, onClose }: MarketModalProps) => {
               </Pressable>
             </ScrollView>
           )}
+        </View>
+      </Modal>
+    );
+  }
+
+  if (buyModalItem && buyModalItemId) {
+    const totalBuyPrice = buyModalItem.buy * buyModalQuantity;
+    const canAffordBuy = coins >= totalBuyPrice;
+
+    return (
+      <Modal visible={visible} transparent animationType="fade">
+        <View style={styles.sellModalOverlay}>
+          <View style={styles.sellModalCard}>
+            <Image
+              source={buyModalItem.image}
+              style={styles.sellModalImage}
+              contentFit="contain"
+            />
+            <Text style={styles.sellModalTitle}>{buyModalItem.name}</Text>
+            <Text style={styles.sellModalSubtitle}>Buy Item</Text>
+
+            <View style={styles.sellInfoCard}>
+              <View style={styles.sellInfoRow}>
+                <Text style={styles.sellInfoLabel}>Your gold:</Text>
+                <View style={styles.sellInfoPrice}>
+                  <Text style={styles.sellInfoValue}>{coins.toLocaleString()}</Text>
+                  <Image
+                    source={coinIcon}
+                    style={styles.sellInfoCoin}
+                    contentFit="contain"
+                  />
+                </View>
+              </View>
+              <View style={styles.sellInfoRow}>
+                <Text style={styles.sellInfoLabel}>Price per item:</Text>
+                <View style={styles.sellInfoPrice}>
+                  <Text style={styles.sellInfoValue}>
+                    {buyModalItem.buy.toLocaleString()}
+                  </Text>
+                  <Image
+                    source={coinIcon}
+                    style={styles.sellInfoCoin}
+                    contentFit="contain"
+                  />
+                </View>
+              </View>
+            </View>
+
+            <Text style={styles.sellSectionTitle}>Quantity to Buy</Text>
+            <View style={styles.sellStepperRow}>
+              <Pressable
+                style={styles.sellStepperBtn}
+                onPress={() => setBuyModalQuantity((value) => Math.max(1, value - 1))}
+              >
+                <Text style={styles.sellStepperText}>-</Text>
+              </Pressable>
+              <TextInput
+                value={String(buyModalQuantity)}
+                onChangeText={(value) => {
+                  const digits = value.replace(/[^\d]/g, "");
+                  if (!digits) {
+                    setBuyModalQuantity(1);
+                    return;
+                  }
+
+                  const parsed = Number(digits);
+                  setBuyModalQuantity(
+                    Math.max(1, Math.min(buyModalMaxQuantity, parsed)),
+                  );
+                }}
+                keyboardType="number-pad"
+                style={styles.sellQtyInput}
+                textAlign="center"
+              />
+              <Pressable
+                style={[styles.sellStepperBtn, styles.sellStepperBtnActive]}
+                onPress={() =>
+                  setBuyModalQuantity((value) =>
+                    Math.min(buyModalMaxQuantity, value + 1),
+                  )
+                }
+              >
+                <Text style={[styles.sellStepperText, styles.sellStepperTextActive]}>+</Text>
+              </Pressable>
+            </View>
+
+            <View style={styles.sellQuickRow}>
+              <Pressable
+                style={styles.sellQuickBtn}
+                onPress={() => setBuyModalQuantity((value) => Math.max(1, value - 10))}
+              >
+                <Text style={styles.sellQuickBtnText}>-10</Text>
+              </Pressable>
+              <Pressable
+                style={styles.sellQuickBtn}
+                onPress={() => setBuyModalQuantity(buyModalMaxQuantity)}
+              >
+                <Text style={styles.sellQuickBtnText}>Max</Text>
+              </Pressable>
+              <Pressable
+                style={styles.sellQuickBtn}
+                onPress={() =>
+                  setBuyModalQuantity((value) =>
+                    Math.min(buyModalMaxQuantity, value + 10),
+                  )
+                }
+              >
+                <Text style={styles.sellQuickBtnText}>+10</Text>
+              </Pressable>
+            </View>
+
+            <View style={styles.sellTotalCard}>
+              <Text style={styles.sellTotalLabel}>Total Price</Text>
+              <View style={styles.sellTotalValueRow}>
+                <Text style={styles.sellTotalValue}>{totalBuyPrice.toLocaleString()}</Text>
+                <Image
+                  source={coinIcon}
+                  style={styles.sellTotalCoin}
+                  contentFit="contain"
+                />
+              </View>
+            </View>
+
+            <View style={styles.sellActionsRow}>
+              <Pressable
+                style={[styles.sellActionBtn, styles.sellCloseBtn]}
+                onPress={() => setBuyModalItemId(null)}
+              >
+                <Text style={styles.sellCloseText}>Close</Text>
+              </Pressable>
+              <Pressable
+                style={[
+                  styles.sellActionBtn,
+                  styles.sellConfirmBtn,
+                  (!canAffordBuy ||
+                    activeMarketActionId === `buy:${buyModalItemId}`) &&
+                    styles.finalPutSaleBtnDisabled,
+                ]}
+                onPress={async () => {
+                  await handleBuyMarketItem(buyModalItemId, buyModalQuantity);
+                  setBuyModalItemId(null);
+                }}
+                disabled={
+                  !canAffordBuy || activeMarketActionId === `buy:${buyModalItemId}`
+                }
+              >
+                <Text style={styles.sellConfirmText}>Buy</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+    );
+  }
+
+  if (sellModalItem && sellModalItemId) {
+    const totalSellPrice = sellModalItem.sell * sellModalQuantity;
+
+    return (
+      <Modal visible={visible} transparent animationType="fade">
+        <View style={styles.sellModalOverlay}>
+          <View style={styles.sellModalCard}>
+            <Image
+              source={sellModalItem.image}
+              style={styles.sellModalImage}
+              contentFit="contain"
+            />
+            <Text style={styles.sellModalTitle}>{sellModalItem.name}</Text>
+            <Text style={styles.sellModalSubtitle}>Sell Item</Text>
+
+            <View style={styles.sellInfoCard}>
+              <View style={styles.sellInfoRow}>
+                <Text style={styles.sellInfoLabel}>Available:</Text>
+                <Text style={styles.sellInfoValue}>{sellModalAvailableQuantity}</Text>
+              </View>
+              <View style={styles.sellInfoRow}>
+                <Text style={styles.sellInfoLabel}>Price per item:</Text>
+                <View style={styles.sellInfoPrice}>
+                  <Text style={styles.sellInfoValue}>
+                    {sellModalItem.sell.toLocaleString()}
+                  </Text>
+                  <Image
+                    source={coinIcon}
+                    style={styles.sellInfoCoin}
+                    contentFit="contain"
+                  />
+                </View>
+              </View>
+            </View>
+
+            <Text style={styles.sellSectionTitle}>Quantity to Sell</Text>
+            <View style={styles.sellStepperRow}>
+              <Pressable
+                style={styles.sellStepperBtn}
+                onPress={() => setSellModalQuantity((value) => Math.max(1, value - 1))}
+              >
+                <Text style={styles.sellStepperText}>-</Text>
+              </Pressable>
+              <TextInput
+                value={String(sellModalQuantity)}
+                onChangeText={(value) => {
+                  const digits = value.replace(/[^\d]/g, "");
+                  if (!digits) {
+                    setSellModalQuantity(1);
+                    return;
+                  }
+
+                  const parsed = Number(digits);
+                  setSellModalQuantity(
+                    Math.max(1, Math.min(sellModalAvailableQuantity, parsed)),
+                  );
+                }}
+                keyboardType="number-pad"
+                style={styles.sellQtyInput}
+                textAlign="center"
+              />
+              <Pressable
+                style={[styles.sellStepperBtn, styles.sellStepperBtnActive]}
+                onPress={() =>
+                  setSellModalQuantity((value) =>
+                    Math.min(sellModalAvailableQuantity, value + 1),
+                  )
+                }
+              >
+                <Text style={[styles.sellStepperText, styles.sellStepperTextActive]}>+</Text>
+              </Pressable>
+            </View>
+
+            <View style={styles.sellQuickRow}>
+              <Pressable
+                style={styles.sellQuickBtn}
+                onPress={() => setSellModalQuantity((value) => Math.max(1, value - 10))}
+              >
+                <Text style={styles.sellQuickBtnText}>-10</Text>
+              </Pressable>
+              <Pressable
+                style={styles.sellQuickBtn}
+                onPress={() => setSellModalQuantity(sellModalAvailableQuantity)}
+              >
+                <Text style={styles.sellQuickBtnText}>Max</Text>
+              </Pressable>
+              <Pressable
+                style={styles.sellQuickBtn}
+                onPress={() =>
+                  setSellModalQuantity((value) =>
+                    Math.min(sellModalAvailableQuantity, value + 10),
+                  )
+                }
+              >
+                <Text style={styles.sellQuickBtnText}>+10</Text>
+              </Pressable>
+            </View>
+
+            <View style={styles.sellTotalCard}>
+              <Text style={styles.sellTotalLabel}>Total Price</Text>
+              <View style={styles.sellTotalValueRow}>
+                <Text style={styles.sellTotalValue}>{totalSellPrice.toLocaleString()}</Text>
+                <Image
+                  source={coinIcon}
+                  style={styles.sellTotalCoin}
+                  contentFit="contain"
+                />
+              </View>
+            </View>
+
+            <View style={styles.sellActionsRow}>
+              <Pressable
+                style={[styles.sellActionBtn, styles.sellCloseBtn]}
+                onPress={() => setSellModalItemId(null)}
+              >
+                <Text style={styles.sellCloseText}>Close</Text>
+              </Pressable>
+              <Pressable
+                style={[
+                  styles.sellActionBtn,
+                  styles.sellConfirmBtn,
+                  activeMarketActionId === `sell:${sellModalItemId}` &&
+                    styles.finalPutSaleBtnDisabled,
+                ]}
+                onPress={async () => {
+                  await handleSellMarketItem(sellModalItemId, sellModalQuantity);
+                  setSellModalItemId(null);
+                }}
+                disabled={activeMarketActionId === `sell:${sellModalItemId}`}
+              >
+                <Text style={styles.sellConfirmText}>Sell</Text>
+              </Pressable>
+            </View>
+          </View>
         </View>
       </Modal>
     );
@@ -1056,6 +1657,16 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     paddingHorizontal: 14,
     paddingVertical: 8,
+  },
+  marketPriceColumn: {
+    gap: 8,
+    alignItems: "flex-end",
+  },
+  salePriceLabel: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: "#7A828A",
+    marginRight: 6,
   },
   salePriceText: {
     fontSize: 16,
@@ -1522,4 +2133,186 @@ const styles = StyleSheet.create({
     elevation: 6,
   },
   closeSvg: { width: 24, height: 24, tintColor: "#FFF" },
+  sellModalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.35)",
+    justifyContent: "center",
+    paddingHorizontal: 28,
+  },
+  sellModalCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 28,
+    paddingHorizontal: 24,
+    paddingTop: 22,
+    paddingBottom: 20,
+  },
+  sellModalImage: {
+    width: 64,
+    height: 64,
+    alignSelf: "center",
+    marginBottom: 8,
+  },
+  sellModalTitle: {
+    fontSize: 18,
+    fontWeight: "900",
+    color: "#1E5B26",
+    textAlign: "center",
+  },
+  sellModalSubtitle: {
+    fontSize: 14,
+    color: "#666",
+    textAlign: "center",
+    marginTop: 6,
+    marginBottom: 18,
+  },
+  sellInfoCard: {
+    backgroundColor: "#F7F7F7",
+    borderRadius: 16,
+    padding: 16,
+    gap: 14,
+  },
+  sellInfoRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  sellInfoLabel: {
+    fontSize: 14,
+    color: "#666",
+  },
+  sellInfoValue: {
+    fontSize: 16,
+    fontWeight: "900",
+    color: "#111",
+  },
+  sellInfoPrice: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  sellInfoCoin: {
+    width: 16,
+    height: 16,
+  },
+  sellSectionTitle: {
+    fontSize: 16,
+    fontWeight: "900",
+    color: "#111",
+    marginTop: 22,
+    marginBottom: 14,
+  },
+  sellStepperRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  sellStepperBtn: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: "#F4F4F4",
+    borderWidth: 1,
+    borderColor: "#E0E0E0",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  sellStepperBtnActive: {
+    backgroundColor: "#F3FFF3",
+    borderColor: "#8AD08A",
+  },
+  sellStepperText: {
+    fontSize: 28,
+    color: "#B6B6B6",
+    fontWeight: "300",
+    lineHeight: 30,
+  },
+  sellStepperTextActive: {
+    color: "#71B312",
+  },
+  sellQtyInput: {
+    flex: 1,
+    height: 56,
+    borderRadius: 16,
+    borderWidth: 2,
+    borderColor: "#8AD08A",
+    fontSize: 22,
+    fontWeight: "900",
+    color: "#111",
+    backgroundColor: "#FFF",
+  },
+  sellQuickRow: {
+    flexDirection: "row",
+    gap: 12,
+    marginTop: 16,
+  },
+  sellQuickBtn: {
+    flex: 1,
+    height: 46,
+    borderRadius: 12,
+    backgroundColor: "#F3FFF3",
+    borderWidth: 1,
+    borderColor: "#CBEBCB",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  sellQuickBtnText: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: "#71B312",
+  },
+  sellTotalCard: {
+    backgroundColor: "#F1FFF1",
+    borderRadius: 16,
+    marginTop: 18,
+    paddingVertical: 18,
+    alignItems: "center",
+  },
+  sellTotalLabel: {
+    fontSize: 14,
+    color: "#666",
+    marginBottom: 10,
+  },
+  sellTotalValueRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  sellTotalValue: {
+    fontSize: 28,
+    fontWeight: "900",
+    color: "#1E5B26",
+  },
+  sellTotalCoin: {
+    width: 24,
+    height: 24,
+  },
+  sellActionsRow: {
+    flexDirection: "row",
+    gap: 16,
+    marginTop: 20,
+  },
+  sellActionBtn: {
+    flex: 1,
+    height: 56,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  sellCloseBtn: {
+    backgroundColor: "#F3F3F3",
+  },
+  sellConfirmBtn: {
+    backgroundColor: "#7BC47F",
+  },
+  sellCloseText: {
+    fontSize: 16,
+    fontWeight: "800",
+    color: "#444",
+  },
+  sellConfirmText: {
+    fontSize: 16,
+    fontWeight: "800",
+    color: "#FFF",
+  },
 });

@@ -84,7 +84,7 @@ export default function ShopScreen() {
     (item: ShopItem, mode: "seed" | "goods") => {
       const serverKey =
         mode === "seed" ? `seed:${item.resourceId}` : item.resourceId;
-      return prices[serverKey] ?? item.price;
+      return prices[serverKey]?.buy ?? item.price;
     },
     [prices],
   );

@@ -1,5 +1,5 @@
 import { CropType } from "@/constants/crops";
-import { useMarketStore } from "@/store/market-store";
+import { MarketPriceEntry, useMarketStore } from "@/store/market-store";
 import { useServerTimeStore } from "@/store/server-time-store";
 import { useFarmStore } from "@/store/farm-store";
 import { useGameStore } from "@/store/game-store";
@@ -56,6 +56,19 @@ function toBackendSeedInventoryKey(cropId: string): string {
     default:
       return `seed:${cropId}`;
   }
+}
+
+function inferInventoryType(id: string): "seed" | "crop" | "animal" | "product" {
+  if (id.startsWith("seed:")) {
+    return "seed";
+  }
+  if (id.startsWith("animal:")) {
+    return "animal";
+  }
+  if (id.startsWith("craft:") || id.startsWith("tool:")) {
+    return "product";
+  }
+  return "crop";
 }
 
 function extractEconomy(data: AnyRecord) {
@@ -147,8 +160,13 @@ function extractPlots(data: AnyRecord) {
               ? "planted"
               : "empty";
       const status =
-        rawStatus === "ready" || rawStatus === "planted" || rawStatus === "empty"
-          ? rawStatus
+        rawStatus === "ready" ||
+        rawStatus === "planted" ||
+        rawStatus === "empty" ||
+        rawStatus === "growing"
+          ? rawStatus === "growing"
+            ? "planted"
+            : rawStatus
           : "empty";
 
       const plotId =
@@ -201,11 +219,26 @@ export function applyServerSync(rawData: unknown) {
 
   if (messageType === "GAME_STATUS") {
     const prices = asRecord(data.prices);
-    const normalizedPrices: Record<string, number> = {};
+    const normalizedPrices: Record<string, MarketPriceEntry> = {};
     if (prices) {
       Object.entries(prices).forEach(([key, value]) => {
         if (typeof value === "number") {
-          normalizedPrices[key] = value;
+          normalizedPrices[key] = {
+            buy: value,
+            sell: value,
+          };
+          return;
+        }
+
+        const record = asRecord(value);
+        const buy = parseNumber(record?.buy);
+        const sell = parseNumber(record?.sell);
+
+        if (typeof buy === "number" || typeof sell === "number") {
+          normalizedPrices[key] = {
+            buy: buy ?? 0,
+            sell: sell ?? 0,
+          };
         }
       });
     }
@@ -293,6 +326,42 @@ export function applyServerSync(rawData: unknown) {
       useGameStore.getState().setEconomyFromServer({
         coins: data.goldBalance,
       });
+    }
+  }
+
+  if (
+    messageType === "BUY_OK" &&
+    typeof data.item === "string" &&
+    typeof data.quantity === "number"
+  ) {
+    useInventoryStore
+      .getState()
+      .applyInventoryDelta(
+        data.item,
+        Math.max(0, data.quantity),
+        inferInventoryType(data.item),
+      );
+
+    if (typeof data.goldSpent === "number") {
+      useGameStore.getState().removeCoins(Math.max(0, data.goldSpent));
+    }
+  }
+
+  if (
+    messageType === "SELL_OK" &&
+    typeof data.item === "string" &&
+    typeof data.quantity === "number"
+  ) {
+    useInventoryStore
+      .getState()
+      .applyInventoryDelta(
+        data.item,
+        -Math.max(0, data.quantity),
+        inferInventoryType(data.item),
+      );
+
+    if (typeof data.goldPaid === "number") {
+      useGameStore.getState().addCoins(Math.max(0, data.goldPaid));
     }
   }
 }

@@ -15,6 +15,11 @@ type ActiveEvent = {
   affectedItems?: string[];
 };
 
+export type MarketPriceEntry = {
+  buy: number;
+  sell: number;
+};
+
 const marketStorage = createMMKV({
   id: "market-storage",
 });
@@ -26,10 +31,10 @@ const zustandStorage: StateStorage = {
 };
 
 interface MarketState {
-  prices: Record<string, number>;
+  prices: Record<string, MarketPriceEntry>;
   activeEvent: ActiveEvent | null;
   setMarketStatusFromServer: (payload: {
-    prices?: Record<string, number>;
+    prices?: Record<string, MarketPriceEntry>;
     activeEvent?: ActiveEvent | null;
   }) => void;
 }

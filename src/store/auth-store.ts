@@ -1,6 +1,6 @@
 import * as SecureStore from "expo-secure-store";
-import { create } from "zustand";
 import { createMMKV } from "react-native-mmkv";
+import { create } from "zustand";
 import { createJSONStorage, persist, StateStorage } from "zustand/middleware";
 
 import {
@@ -28,6 +28,7 @@ interface AuthState {
   accessExpiresAt: number | null;
   profile: AuthProfile | null;
   setSession: (payload: VerifyResponse) => Promise<void>;
+  markSessionAvailable: () => void;
   clearSession: () => Promise<void>;
   getAccessToken: () => Promise<string | null>;
   getRefreshToken: () => Promise<string | null>;
@@ -58,6 +59,12 @@ export const useAuthStore = create<AuthState>()(
           profile: payload.profile,
         });
       },
+      markSessionAvailable: () =>
+        set((state) => ({
+          isAuthenticated: true,
+          accessExpiresAt: state.accessExpiresAt,
+          profile: state.profile,
+        })),
       clearSession: async () => {
         await Promise.all([
           SecureStore.deleteItemAsync(ACCESS_TOKEN_KEY),
@@ -85,7 +92,9 @@ export const useAuthStore = create<AuthState>()(
           });
           return refreshed.accessToken;
         } catch {
-          await get().clearSession();
+          // Never delete local credentials on transient refresh failure.
+          // Only an explicit logout should clear device-stored auth state.
+          get().markSessionAvailable();
           return null;
         }
       },
@@ -95,7 +104,8 @@ export const useAuthStore = create<AuthState>()(
 
         if (!accessToken) {
           if (!refreshToken) return null;
-          return get().refreshSession();
+          const refreshedToken = await get().refreshSession();
+          return refreshedToken;
         }
 
         const accessExpiresAt = get().accessExpiresAt;
@@ -113,8 +123,21 @@ export const useAuthStore = create<AuthState>()(
         }
 
         // Token is close to expiry; refresh first.
-        if (!refreshToken) return null;
-        return get().refreshSession();
+        if (!refreshToken) {
+          get().markSessionAvailable();
+          return accessToken;
+        }
+
+        const refreshedToken = await get().refreshSession();
+        if (refreshedToken) {
+          return refreshedToken;
+        }
+
+        // Keep the last known access token locally so the user is not
+        // forcibly logged out while offline; backend calls may still fail
+        // until connectivity or sign-in is restored.
+        get().markSessionAvailable();
+        return accessToken;
       },
       logout: async () => {
         const refreshToken = await get().getRefreshToken();

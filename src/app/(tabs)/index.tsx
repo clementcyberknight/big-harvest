@@ -89,7 +89,8 @@ export default function HomeScreen() {
     Object.values(state.items).reduce((acc, item) => acc + item.quantity, 0),
   );
   const selectedCropQuantity = useInventoryStore(
-    (state) => state.items[toBackendSeedInventoryKey(selectedCropId)]?.quantity || 0,
+    (state) =>
+      state.items[toBackendSeedInventoryKey(selectedCropId)]?.quantity || 0,
   );
 
   useEffect(() => {
